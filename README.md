@@ -206,6 +206,8 @@ Allow the Vercel backend’s outbound network access in Atlas using an appropria
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
 
+The Vercel build log should run the frontend workspace build (`tsc -b && vite build`) and report `dist/index.html`. If it instead runs the root `npm run build --workspaces` and expects `public`, the Vercel project's Root Directory or Output Directory settings are not applied correctly; set the frontend Root Directory to `packages/frontend` and Output Directory to `dist`.
+
 Set `VITE_API_URL` to `https://<backend-domain>/api` in the frontend project’s build environment. This is public configuration, not a secret. The frontend [`vercel.json`](packages/frontend/vercel.json) rewrites SPA paths such as `/shop`, `/admin`, and checkout return routes to `index.html`, so direct navigation and refresh work.
 
 Set Vercel production and preview values deliberately: each frontend origin must be allowed by the backend’s single-origin `FRONTEND_URL` setting, or preview access must be handled through a separately designed allowlist. Register the Stripe test webhook against the deployed backend URL and use that endpoint’s signing secret. Do not enable live keys or live webhook endpoints.
