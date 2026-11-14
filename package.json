@@ -1,0 +1,19 @@
+{
+  "name": "paybridge",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/frontend",
+    "packages/backend"
+  ],
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail \"npm run dev -w @paybridge/backend\" \"npm run dev -w @paybridge/frontend\"",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test -w @paybridge/backend",
+    "seed": "npm run seed -w @paybridge/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
