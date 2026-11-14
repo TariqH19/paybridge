@@ -1,7 +1,8 @@
 import cors from "cors";
+import { randomUUID } from "node:crypto";
 import express, { type ErrorRequestHandler } from "express";
 import { config } from "./config.js";
-import { getDatabase } from "./db.js";
+import { connectToDatabase, getDatabase } from "./db.js";
 import { adminRouter } from "./admin/admin.router.js";
 import { ordersRouter } from "./orders/orders.router.js";
 import { productsRouter } from "./products/products.router.js";
@@ -10,6 +11,10 @@ import { stripeWebhookRouter } from "./stripe/stripe-webhook.router.js";
 
 export const app = express();
 
+app.use((_request, response, next) => {
+  response.setHeader("x-request-id", randomUUID());
+  next();
+});
 app.use(cors({ origin: config.FRONTEND_URL }));
 app.use(
   "/api/webhooks/stripe",
@@ -17,6 +22,15 @@ app.use(
   stripeWebhookRouter,
 );
 app.use(express.json());
+
+app.use(async (_request, _response, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.get("/api/health", async (_request, response, next) => {
   try {
@@ -37,19 +51,46 @@ app.use((_request, response) => {
 });
 
 const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
+  const candidateStatus =
+    typeof error === "object" && error !== null
+      ? "status" in error
+        ? error.status
+        : "statusCode" in error
+          ? error.statusCode
+          : undefined
+      : undefined;
   const status =
-    typeof error === "object" &&
-    error !== null &&
-    "status" in error &&
-    typeof error.status === "number" &&
-    error.status >= 400 &&
-    error.status < 500
-      ? error.status
+    typeof candidateStatus === "number" && candidateStatus >= 400 && candidateStatus < 500
+      ? candidateStatus
       : 500;
-  console.error("Request failed", error instanceof Error ? error.name : "Unknown error");
-  response
-    .status(status)
-    .json({ error: status === 400 ? "Invalid request body" : "Internal server error" });
+
+  if (status >= 500) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "http_request_failed",
+        requestId: response.getHeader("x-request-id"),
+        method: _request.method,
+        path: _request.path,
+        status,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      }),
+    );
+  }
+
+  const message =
+    status === 400
+      ? "Invalid request body"
+      : status === 413
+        ? "Request body is too large"
+        : status === 415
+          ? "Unsupported media type"
+          : status < 500
+            ? "Invalid request"
+            : "Internal server error";
+  response.status(status).json({ error: message });
 };
 
 app.use(errorHandler);
+
+export default app;

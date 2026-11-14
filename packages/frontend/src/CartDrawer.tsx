@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import type { CartRow, CreatedOrder, OrderItem } from "./types";
+import { apiUrl, getApiErrorMessage, requestJson } from "./api";
 import { createStripeCheckoutUrl } from "./checkoutClient";
 
 type CartDrawerProps = {
@@ -25,8 +26,6 @@ type CartDrawerProps = {
   onClose: () => void;
   onOrderCreated: () => void;
 };
-
-const apiUrl = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 function formatPrice(price: number, currency: string): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(price / 100);
@@ -76,15 +75,6 @@ function isCreatedOrder(value: unknown): value is CreatedOrder {
   );
 }
 
-function getErrorMessage(value: unknown, fallback: string): string {
-  if (typeof value !== "object" || value === null) {
-    return fallback;
-  }
-
-  const message = (value as Record<string, unknown>).error;
-  return typeof message === "string" ? message : fallback;
-}
-
 export default function CartDrawer({
   rows,
   subtotal,
@@ -125,7 +115,7 @@ export default function CartDrawer({
     setSubmitting(true);
 
     try {
-      const response = await fetch(`${apiUrl}/orders`, {
+      const { response, body } = await requestJson(`${apiUrl}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -136,16 +126,17 @@ export default function CartDrawer({
           })),
         }),
       });
-      const payload: unknown = await response.json();
 
       if (!response.ok) {
-        throw new Error(getErrorMessage(payload, `Order request failed (${response.status})`));
+        throw new Error(
+          getApiErrorMessage(body, `Order request failed (${response.status})`),
+        );
       }
-      if (!isCreatedOrder(payload)) {
+      if (!isCreatedOrder(body)) {
         throw new Error("The order response was not in the expected format.");
       }
 
-      setOrder(payload);
+      setOrder(body);
       onOrderCreated();
     } catch (error) {
       setOrderError(

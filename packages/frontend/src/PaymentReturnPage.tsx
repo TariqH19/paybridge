@@ -71,11 +71,11 @@ export default function PaymentReturnPage({ variant }: PaymentReturnPageProps) {
             {retrying ? "Reopening Checkout…" : "Retry with Stripe"}
           </button>
         )}
-        <a className="return-shop-link" href="/#catalogue">
+        <a className="return-shop-link" href="/shop#catalogue">
           <ArrowLeft size={14} /> Back to the shop
         </a>
       </section>
-      <span className="return-footnote">PayBridge · Thoughtfully picked for everyday.</span>
+      <span className="return-footnote">PayBridge · Stripe sandbox only · No live payments.</span>
     </main>
   );
 }

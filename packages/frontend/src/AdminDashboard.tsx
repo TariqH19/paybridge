@@ -126,8 +126,10 @@ function StatusBadge({ status }: { status: string }) {
 
 function AdminLogin({
   onLogin,
+  notice,
 }: {
   onLogin: (username: string, password: string) => Promise<void>;
+  notice: string;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -178,6 +180,7 @@ function AdminLogin({
               required
             />
           </label>
+          {notice && <div className="admin-session-notice" role="status">{notice}</div>}
           {error && <div className="admin-inline-error" role="alert">{error}</div>}
           <button className="admin-primary-button" disabled={busy}>
             {busy ? <LoaderCircle className="admin-spin" size={16} /> : <ShieldCheck size={16} />}
@@ -186,7 +189,10 @@ function AdminLogin({
         </form>
         <div className="admin-login-foot"><ShieldCheck size={14} /> Admin APIs are protected by backend authentication.</div>
       </section>
-      <a className="admin-back-link" href="/">← Back to the storefront</a>
+      <div className="admin-login-links">
+        <a className="admin-back-link" href="/">← Project overview</a>
+        <a className="admin-back-link" href="/shop">Visit storefront <ChevronRight size={13} /></a>
+      </div>
     </main>
   );
 }
@@ -195,6 +201,7 @@ function AdminDashboard() {
   const [token, setToken] = useState<string | null>(() =>
     window.sessionStorage.getItem(SESSION_STORAGE_KEY),
   );
+  const [sessionNotice, setSessionNotice] = useState("");
   const [view, setView] = useState<AdminView>("overview");
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [investigation, setInvestigation] = useState<PendingOrderInvestigation | null>(null);
@@ -228,9 +235,10 @@ function AdminDashboard() {
     setToken(session.token);
   }
 
-  function signOut() {
+  function signOut(notice = "") {
     window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
     setToken(null);
+    setSessionNotice(notice);
     setOverview(null);
     setInvestigation(null);
     setOrders([]);
@@ -283,8 +291,7 @@ function AdminDashboard() {
       } catch (loadError) {
         if (!active) return;
         if (loadError instanceof AdminApiError && loadError.status === 401) {
-          signOut();
-          setError("Your admin session expired. Please sign in again.");
+          signOut("Your admin session expired. Sign in again.");
         } else {
           setError(loadError instanceof Error ? loadError.message : "Unable to load admin data.");
         }
@@ -319,6 +326,10 @@ function AdminDashboard() {
     try {
       setSelectedOrder(await getAdminOrder(token, orderId));
     } catch (detailError) {
+      if (detailError instanceof AdminApiError && detailError.status === 401) {
+        signOut("Your admin session expired. Sign in again.");
+        return;
+      }
       setOrderDetailError(
         detailError instanceof Error ? detailError.message : "Unable to load order details.",
       );
@@ -335,6 +346,10 @@ function AdminDashboard() {
     try {
       setSelectedEvent(await getAdminWebhookEvent(token, eventId));
     } catch (detailError) {
+      if (detailError instanceof AdminApiError && detailError.status === 401) {
+        signOut("Your admin session expired. Sign in again.");
+        return;
+      }
       setEventDetailError(
         detailError instanceof Error ? detailError.message : "Unable to load event details.",
       );
@@ -353,7 +368,12 @@ function AdminDashboard() {
     },
   ) {
     if (!token) throw new Error("Admin authentication is required.");
-    const result = await createAdminRefund(token, orderId, input);
+    const result = await createAdminRefund(token, orderId, input).catch((refundError: unknown) => {
+      if (refundError instanceof AdminApiError && refundError.status === 401) {
+        signOut("Your admin session expired. Sign in again.");
+      }
+      throw refundError;
+    });
     setRefreshVersion((value) => value + 1);
     try {
       setSelectedOrder(await getAdminOrder(token, orderId));
@@ -370,7 +390,7 @@ function AdminDashboard() {
   }
 
   if (!token) {
-    return <AdminLogin onLogin={signIn} />;
+    return <AdminLogin onLogin={signIn} notice={sessionNotice} />;
   }
 
   const navigation: Array<{ id: AdminView; label: string; icon: typeof LayoutDashboard }> = [
@@ -405,8 +425,9 @@ function AdminDashboard() {
         </nav>
         <div className="admin-sidebar-bottom">
           <div className="admin-secure-note"><ShieldCheck size={15} /> Protected admin session</div>
-          <a className="admin-sidebar-store" href="/">View storefront <ChevronRight size={14} /></a>
-          <button className="admin-signout" onClick={signOut}><LogOut size={15} /> Sign out</button>
+          <a className="admin-sidebar-store" href="/shop">View storefront <ChevronRight size={14} /></a>
+          <a className="admin-sidebar-store" href="/">Project overview <ChevronRight size={14} /></a>
+          <button className="admin-signout" onClick={() => signOut()}><LogOut size={15} /> Sign out</button>
         </div>
       </aside>
 
@@ -414,7 +435,7 @@ function AdminDashboard() {
         <header className="admin-topbar">
           <div className="admin-mobile-brand">
             <a className="admin-brand" href="/admin"><span className="admin-brand-mark">p.</span> PayBridge</a>
-            <button className="admin-signout-mobile" onClick={signOut} aria-label="Sign out"><LogOut size={17} /></button>
+            <button className="admin-signout-mobile" onClick={() => signOut()} aria-label="Sign out"><LogOut size={17} /></button>
           </div>
           <div className="admin-breadcrumb">PayBridge <span>/</span> {navigation.find((item) => item.id === view)?.label}</div>
           <div className="admin-topbar-actions">

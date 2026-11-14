@@ -3,11 +3,28 @@ import { config } from "./config.js";
 
 const client = new MongoClient(config.MONGODB_URI);
 let database: Db | undefined;
+let databasePromise: Promise<Db> | undefined;
 
-export async function connectToDatabase(): Promise<Db> {
-  await client.connect();
-  database = client.db("paybridge");
+export function connectToDatabase(): Promise<Db> {
+  if (!databasePromise) {
+    databasePromise = client
+      .connect()
+      .then(() => {
+        database = client.db("paybridge");
+        return database;
+      })
+      .catch((error: unknown) => {
+        database = undefined;
+        databasePromise = undefined;
+        throw error;
+      });
+  }
 
+  return databasePromise;
+}
+
+export async function createDatabaseIndexes(): Promise<void> {
+  const database = await connectToDatabase();
   await database.collection("products").createIndexes([
     { key: { active: 1, category: 1, name: 1 }, name: "active_category_name" },
     { key: { createdAt: -1 }, name: "created_at_desc" },
@@ -49,8 +66,6 @@ export async function connectToDatabase(): Promise<Db> {
       name: "refund_currency_status_created_at",
     },
   ]);
-
-  return database;
 }
 
 export function getDatabase(): Db {
@@ -68,4 +83,5 @@ export function getMongoClient(): MongoClient {
 export async function closeDatabase(): Promise<void> {
   await client.close();
   database = undefined;
+  databasePromise = undefined;
 }

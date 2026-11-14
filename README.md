@@ -12,12 +12,14 @@ MongoDB Atlas is the operational data backbone. The application stores catalogue
 - [MongoDB Atlas in the solution](#mongodb-atlas-in-the-solution)
 - [Technology stack](#technology-stack)
 - [Local setup](#local-setup)
+- [Vercel deployment](#vercel-deployment)
 - [Example workflows](#example-workflows)
 - [Known limitations](#known-limitations)
 
 ## Implemented features
 
 - **Product catalogue:** Responsive React storefront fetches active products from the API; products are not hardcoded in the frontend.
+- **Project landing page:** A public architecture overview links to the storefront and admin dashboard; the storefront remains available at `/shop`.
 - **Cart and order creation:** Cart persists in browser localStorage. The backend accepts product IDs and quantities, reads current prices/stock, validates currency and availability, and creates a pending order with purchase-time snapshots.
 - **Stripe sandbox payments:** Backend creates or reuses Stripe Checkout Sessions using order snapshots. Stripe secret keys remain backend-only and the client accepts standard test-mode secret keys.
 - **Webhook-driven confirmation:** Raw webhook bodies are signature-verified. Payment/order state changes are based on Stripe events, not the browser return page.
@@ -34,6 +36,7 @@ No screenshot assets are currently present in the repository. Capture these view
 
 | View | Recommended filename |
 |---|---|
+| Portfolio project landing page | `project-landing.png` |
 | Customer storefront | `storefront.png` |
 | Shopping cart | `shopping-cart.png` |
 | Stripe Checkout in test mode | `stripe-checkout-test-mode.png` |
@@ -61,7 +64,7 @@ flowchart LR
   Stripe -->|Hosted checkout and return redirect| Browser
 ```
 
-The React/Vite frontend fetches products, persists the cart locally, submits orders, redirects customers to hosted Checkout, and renders the admin dashboard. The Express backend owns price calculations, order/payment persistence, admin authorization, Stripe API calls, signature verification, and MongoDB aggregation. MongoDB Atlas stores the application records; Stripe hosts payment collection and reports asynchronous outcomes. In local development, Vite proxies `/api` to the backend.
+The React/Vite frontend provides the public project overview, customer storefront at `/shop`, checkout return pages, and protected admin dashboard at `/admin`. It fetches products, persists the cart locally, submits orders, and redirects customers to hosted Checkout. The Express backend owns price calculations, order/payment persistence, admin authorization, Stripe API calls, signature verification, and MongoDB aggregation. MongoDB Atlas stores the application records; Stripe hosts payment collection and reports asynchronous outcomes. In local development, Vite proxies `/api` to the backend.
 
 The Stripe success/cancel URLs return to the frontend, but those pages do not update payment status. The backend verifies Stripe's raw webhook body and applies supported event transitions transactionally. Admin APIs are protected independently of the frontend `/admin` route.
 
@@ -115,22 +118,31 @@ Versions below are resolved in `package-lock.json`; Node.js is the documented ru
 3. Configure `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `ADMIN_SESSION_SECRET` to enable `/admin`. Use a private session secret with at least 32 characters.
 4. Configure `STRIPE_SECRET_KEY` with a standard test secret key beginning `sk_test_`. Configure `STRIPE_WEBHOOK_SECRET` as described in [Stripe CLI setup](#stripe-cli-webhook-setup). These values belong only in the backend environment; never put them in frontend variables.
 5. Optionally set `PORT` (defaults to `3001`) and `FRONTEND_URL` (defaults to `http://localhost:5173`). The frontend uses `/api` by default; `VITE_API_URL` is optional.
-6. From the repository root, install dependencies and seed the catalogue:
+6. From the repository root, install dependencies:
 
    ```sh
    npm install
+   ```
+
+7. Ensure the PayBridge indexes exist. This is a controlled setup command; the API does not create indexes on request or serverless cold start:
+
+   ```sh
+   npm run db:indexes
+   ```
+
+8. Seed the catalogue if needed. The seed script upserts eight demo products by name, so it can be run again without duplicating them:
+
+   ```sh
    npm run seed
    ```
 
-   The seed script upserts eight demo products by name, so it can be run again without duplicating them.
-
-7. Start the frontend and backend together:
+9. Start the frontend and backend together:
 
    ```sh
    npm run dev
    ```
 
-   Open the Vite URL, normally `http://localhost:5173`. The backend listens on port `3001` by default.
+   Open the Vite URL, normally `http://localhost:5173` for the project overview. The storefront is at `/shop`, the admin dashboard at `/admin`, and the backend listens on port `3001` by default.
 
 Useful code-quality commands:
 
@@ -159,6 +171,44 @@ Set the `whsec_...` signing secret printed by the CLI as `STRIPE_WEBHOOK_SECRET`
 - `charge.refunded`
 
 For a Dashboard-managed webhook endpoint, use a publicly reachable URL and that endpoint's own signing secret. Do not configure live credentials; the backend accepts standard `sk_test_` keys only.
+
+## Vercel deployment
+
+Deploy the backend and frontend as **two Vercel projects** connected to this repository. Vercel’s Express integration supports an exported Express application as a Function; the backend entry is [`src/app.ts`](packages/backend/src/app.ts), which default-exports the app. A request initializes the shared MongoDB connection before reaching API routes. Indexes are created separately with `npm run db:indexes`, not during API requests or cold starts.
+
+### Backend project
+
+| Vercel setting | Value |
+|---|---|
+| Root Directory | `packages/backend` |
+| Framework Preset | Express |
+| Build Command | `npm run build` |
+| Output Directory | Leave unset; Vercel manages the Express Function output |
+
+No backend `vercel.json` is required with the Express preset and this default-export entry. Use the repository’s npm workspace lockfile during dependency installation. Do not set `PORT` for the Vercel Function. Keep the existing `/api` route paths; for example, health is `/api/health` and the Stripe test webhook is `/api/webhooks/stripe`.
+
+Configure these values in the **backend project only**:
+
+- `MONGODB_URI`: Atlas URI for a PayBridge database user. The app explicitly selects `paybridge`.
+- `FRONTEND_URL`: the exact public frontend origin, such as `https://<frontend-domain>`. It is used for CORS and Checkout return URLs.
+- `STRIPE_SECRET_KEY`: Stripe sandbox standard secret key (`sk_test_...`) only.
+- `STRIPE_WEBHOOK_SECRET`: the signing secret for the Dashboard-configured test endpoint at `/api/webhooks/stripe`.
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `ADMIN_SESSION_SECRET`: set together to enable the protected admin APIs; the session secret must be at least 32 characters.
+
+Allow the Vercel backend’s outbound network access in Atlas using an appropriate access configuration. Do not reuse SmartSearch’s database or assume its network rules apply.
+
+### Frontend project
+
+| Vercel setting | Value |
+|---|---|
+| Root Directory | `packages/frontend` |
+| Framework Preset | Vite |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+
+Set `VITE_API_URL` to `https://<backend-domain>/api` in the frontend project’s build environment. This is public configuration, not a secret. The frontend [`vercel.json`](packages/frontend/vercel.json) rewrites SPA paths such as `/shop`, `/admin`, and checkout return routes to `index.html`, so direct navigation and refresh work.
+
+Set Vercel production and preview values deliberately: each frontend origin must be allowed by the backend’s single-origin `FRONTEND_URL` setting, or preview access must be handled through a separately designed allowlist. Register the Stripe test webhook against the deployed backend URL and use that endpoint’s signing secret. Do not enable live keys or live webhook endpoints.
 
 ## Example workflows
 

@@ -12,7 +12,13 @@ async function startServer(): Promise<void> {
   const shutdown = async () => {
     server.close(async (error) => {
       if (error) {
-        console.error("Failed to close the HTTP server", error);
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "server_shutdown_failed",
+            errorName: error instanceof Error ? error.name : "UnknownError",
+          }),
+        );
         process.exitCode = 1;
       }
 
@@ -25,6 +31,12 @@ async function startServer(): Promise<void> {
 }
 
 startServer().catch((error: unknown) => {
-  console.error("Failed to start PayBridge API", error);
+  console.error(
+    JSON.stringify({
+      level: "error",
+      event: "server_startup_failed",
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    }),
+  );
   process.exitCode = 1;
 });

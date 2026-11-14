@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { apiUrl, getApiErrorMessage, requestJson } from "./api";
+
 export type AdminOrderStatus = "pending" | "paid" | "payment_failed" | "cancelled";
 export type AdminPaymentStatus = AdminOrderStatus | "not_started";
 
@@ -244,46 +246,28 @@ export class AdminApiError extends Error {
   }
 }
 
-const apiUrl = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
-
 async function request<T>(
   path: string,
   token?: string,
   init?: RequestInit,
 ): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`${apiUrl}/admin${path}`, {
-      ...init,
-      headers: {
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...init?.headers,
-      },
-    });
-  } catch {
-    throw new Error("Could not reach the PayBridge API. Check that the backend is running.");
-  }
-
-  let result: unknown;
-  try {
-    result = await response.json();
-  } catch {
-    result = null;
-  }
+  const { response, body } = await requestJson(`${apiUrl}/admin${path}`, {
+    ...init,
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
+  });
 
   if (!response.ok) {
-    const message =
-      typeof result === "object" &&
-      result !== null &&
-      "error" in result &&
-      typeof result.error === "string"
-        ? result.error
-        : `Admin request failed (${response.status}).`;
-    throw new AdminApiError(message, response.status);
+    throw new AdminApiError(
+      getApiErrorMessage(body, `Admin request failed (${response.status}).`),
+      response.status,
+    );
   }
 
-  return result as T;
+  return body as T;
 }
 
 export function createAdminSession(username: string, password: string) {

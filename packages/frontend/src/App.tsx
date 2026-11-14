@@ -14,11 +14,12 @@ import {
 } from "lucide-react";
 import CartDrawer from "./CartDrawer";
 import AdminDashboard from "./AdminDashboard";
+import NotFoundPage from "./NotFoundPage";
 import PaymentReturnPage from "./PaymentReturnPage";
+import ProjectLandingPage from "./ProjectLandingPage";
+import { apiUrl, getApiErrorMessage, requestJson } from "./api";
 import { readStoredCart, saveCart } from "./cart";
 import type { CartItem, Product } from "./types";
-
-const apiUrl = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 function isProduct(value: unknown): value is Product {
   if (typeof value !== "object" || value === null) {
@@ -121,12 +122,14 @@ function Storefront() {
     setError(null);
 
     try {
-      const response = await fetch(`${apiUrl}/products`, { signal });
+      const { response, body } = await requestJson(`${apiUrl}/products`, { signal });
       if (!response.ok) {
-        throw new Error(`Catalogue request failed (${response.status})`);
+        throw new Error(
+          getApiErrorMessage(body, `Catalogue request failed (${response.status})`),
+        );
       }
 
-      const result: unknown = await response.json();
+      const result = body;
       if (!Array.isArray(result) || !result.every(isProduct)) {
         throw new Error("The catalogue response was not in the expected format");
       }
@@ -229,7 +232,7 @@ function Storefront() {
       </div>
 
       <header className="site-header">
-        <a className="brand" href="#" aria-label="PayBridge home">
+        <a className="brand" href="/" aria-label="PayBridge project overview">
           <span className="brand-mark">p<span>.</span></span>
           <span>paybridge</span>
         </a>
@@ -239,8 +242,8 @@ function Storefront() {
           <a href="#footer">Say hello</a>
         </nav>
         <div className="header-actions">
-          <a className="header-link" href="#catalogue">
-            Explore the shop <ArrowUpRight size={15} />
+          <a className="header-link" href="/admin">
+            Admin <ArrowUpRight size={15} />
           </a>
           <button
             className="cart-nav-button"
@@ -329,7 +332,7 @@ function Storefront() {
             <div className="state-panel error-panel" role="alert">
               <span className="state-icon"><Headphones size={22} /></span>
               <h3>We couldn’t load the good stuff.</h3>
-              <p>{error}. Check that the API is running, then try again.</p>
+              <p>{error}</p>
               <button className="secondary-button" onClick={() => void loadProducts()}>
                 Try again <RotateCcw size={15} />
               </button>
@@ -366,11 +369,13 @@ function Storefront() {
       </main>
 
       <footer className="site-footer" id="footer">
-        <a className="brand footer-brand" href="#">
+        <a className="brand footer-brand" href="/">
           <span className="brand-mark">p<span>.</span></span>
           <span>paybridge</span>
         </a>
         <span>Useful things for your everyday.</span>
+        <a className="store-footer-link" href="/">Project overview</a>
+        <a className="store-footer-link" href="/admin">Admin dashboard</a>
         <span>© {new Date().getFullYear()} PayBridge</span>
       </footer>
       {cartOpen && (
@@ -392,7 +397,13 @@ function Storefront() {
 }
 
 function App() {
-  const path = window.location.pathname;
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (path === "/") {
+    return <ProjectLandingPage />;
+  }
+  if (path === "/shop") {
+    return <Storefront />;
+  }
   if (path === "/admin" || path === "/admin/") {
     return <AdminDashboard />;
   }
@@ -402,7 +413,7 @@ function App() {
   if (path === "/checkout/cancelled") {
     return <PaymentReturnPage variant="cancelled" />;
   }
-  return <Storefront />;
+  return <NotFoundPage />;
 }
 
 export default App;

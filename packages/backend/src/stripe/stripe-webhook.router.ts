@@ -36,8 +36,16 @@ stripeWebhookRouter.post("/", async (request, response) => {
   try {
     const duplicate = await processStripeEvent(event);
     response.status(200).json({ received: true, duplicate });
-  } catch {
-    console.error("Stripe webhook processing failed");
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        event: "stripe_webhook_processing_failed",
+        stripeEventId: event.id,
+        stripeEventType: event.type,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      }),
+    );
     response.status(500).json({ error: "Unable to process Stripe webhook event" });
   }
 });
