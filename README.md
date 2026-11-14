@@ -4,6 +4,14 @@ PayBridge is a single-merchant commerce application that turns a product catalog
 
 MongoDB Atlas is the operational data backbone. The application stores catalogue documents, immutable order-item snapshots, payment attempts, refund records, and processed webhook metadata in the `paybridge` database. The model combines embedded purchase snapshots with separately evolving payment/refund records; indexes and aggregation pipelines support order lookup, webhook idempotency, refund reconciliation, and admin reporting.
 
+## Admin login
+username: admin
+password: admin
+
+## Screenshots
+
+![App Screenshot](https://image-upload-example2.s3.eu-west-1.amazonaws.com/paybridge.jpg)
+
 ## Table of contents
 
 - [Implemented features](#implemented-features)
