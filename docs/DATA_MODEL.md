@@ -2,7 +2,7 @@
 
 ## Database and validation
 
-The backend connects with the official MongoDB Node.js driver and explicitly selects the `paybridge` database. Collections are created/indexed at backend startup. MongoDB-generated `_id` values are `ObjectId`s unless noted.
+The backend connects with the official MongoDB Node.js driver and explicitly selects the `paybridge` database. Indexes are applied by the controlled `npm run db:indexes` setup command, not during API requests or server startup. MongoDB-generated `_id` values are `ObjectId`s unless noted.
 
 Zod schemas in the backend define application-level shapes for products, orders, payments, refunds, request payloads, and analytics filters/results. These schemas validate data at API boundaries and when selected documents are read. There are no MongoDB collection-level `$jsonSchema` validators, so writes made outside the application are not constrained by those Zod schemas.
 
@@ -119,7 +119,7 @@ The order-item relationship to products is informational, not a MongoDB referenc
 
 ## Indexes
 
-The backend calls `createIndexes()` during startup. The following indexes are configured:
+The backend's `createDatabaseIndexes()` setup operation calls `createIndexes()` for the following indexes:
 
 | Collection | Index | Purpose |
 |---|---|---|
@@ -144,6 +144,8 @@ The backend calls `createIndexes()` during startup. The following indexes are co
 | `refunds` | `{ currency: 1, status: 1, createdAt: -1 }` | Currency/status/date refund analytics |
 
 The default `_id` indexes support lookup joins from refunds to orders. Indexes improve common equality filters and recent-list queries, but do not eliminate the cost of broad, unbounded analytics aggregations.
+
+For the detailed rationale and transaction/aggregation discussion, see [MongoDB architecture](./MONGODB_ARCHITECTURE.md).
 
 ## Analytics aggregation shapes
 

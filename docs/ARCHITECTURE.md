@@ -13,7 +13,7 @@ flowchart LR
   subgraph Browser
     Customer[Customer browser]
     Admin[Admin browser]
-    SPA[React application<br/>storefront, cart, checkout return pages, /admin]
+    SPA[React application<br/>project landing, /shop, checkout returns, /admin]
     Customer --> SPA
     Admin --> SPA
   end
@@ -49,7 +49,7 @@ In development, Vite proxies `/api` requests to the backend at `http://localhost
 | MongoDB Atlas | Persist product catalogue, immutable order-item snapshots, payment attempts, refund records, and processed webhook metadata. |
 | Stripe | Host Checkout and execute payment/refund operations. Its signed events are reconciled into PayBridge state. |
 
-The frontend selects `/admin`, `/checkout/success`, and `/checkout/cancelled` by pathname; other paths render the storefront. This is a small SPA route switch rather than a client-side routing framework.
+The frontend selects `/` for the public project landing page, `/shop` for the storefront, `/admin` for the admin dashboard, and dedicated checkout return paths. Unknown paths show a not-found page. This is a small SPA route switch rather than a client-side routing framework.
 
 ### API boundaries
 
@@ -61,7 +61,10 @@ The frontend selects `/admin`, `/checkout/success`, and `/checkout/cancelled` by
 | `POST /api/orders/:id/checkout` | Public request to create/reuse Checkout for a pending order |
 | `POST /api/webhooks/stripe` | Stripe-only signed webhook endpoint; raw body required |
 | `POST /api/admin/session` | Admin credential exchange for a signed bearer token |
-| Other `/api/admin/*` routes | Bearer-token protected dashboard, order, payment, webhook metadata, refund, and analytics operations |
+| `GET /api/admin/overview`, `/analytics`, `/orders`, `/orders/:id`, `/payments`, `/webhook-events`, `/webhook-events/:eventId`, `/investigations/pending-order` | Bearer-token protected read operations |
+| `POST /api/admin/orders/:id/refunds` | Bearer-token protected refund request |
+
+Interactive API reference is available at backend `/` and the OpenAPI document at `/api/openapi.json`. Swagger UI permits Try it out only for `GET` and `HEAD`; state-changing operations are documented but not executable from the UI.
 
 ## Customer order and payment lifecycle
 
@@ -169,9 +172,9 @@ flowchart TD
 
 ## MongoDB architecture
 
-The backend uses one official MongoDB Node.js driver client and explicitly selects the `paybridge` database. Collection responsibilities, document shapes, relationships, and indexes are described in [DATA_MODEL.md](./DATA_MODEL.md).
+The backend uses one official MongoDB Node.js driver client and explicitly selects the `paybridge` database. Collection responsibilities, document shapes, relationships, and indexes are described in [DATA_MODEL.md](./DATA_MODEL.md) and [MONGODB_ARCHITECTURE.md](./MONGODB_ARCHITECTURE.md).
 
-Application schemas are validated with Zod at API boundaries and when reading persisted documents. MongoDB collection-level JSON Schema validators are not configured. Refund reservations and webhook state changes use multi-document transactions; product/order reads and ordinary order insertion do not.
+Application schemas are validated with Zod at API boundaries and when reading persisted documents. MongoDB collection-level JSON Schema validators are not configured. Refund reservations and webhook state changes use multi-document transactions; product/order reads and ordinary order insertion do not. Index creation is controlled separately with `npm run db:indexes`; ordinary requests and serverless cold starts do not create indexes.
 
 ## Known boundaries
 

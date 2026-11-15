@@ -1,6 +1,7 @@
 import cors from "cors";
 import { randomUUID } from "node:crypto";
 import express, { type ErrorRequestHandler } from "express";
+import swaggerUi from "swagger-ui-express";
 import { config } from "./config.js";
 import { connectToDatabase, getDatabase } from "./db.js";
 import { adminRouter } from "./admin/admin.router.js";
@@ -8,6 +9,7 @@ import { ordersRouter } from "./orders/orders.router.js";
 import { productsRouter } from "./products/products.router.js";
 import { checkoutRouter } from "./stripe/checkout.router.js";
 import { stripeWebhookRouter } from "./stripe/stripe-webhook.router.js";
+import { openApiDocument } from "./openapi.js";
 
 export const app = express();
 
@@ -16,6 +18,29 @@ app.use((_request, response, next) => {
   next();
 });
 app.use(cors({ origin: config.FRONTEND_URL }));
+const swaggerOptions = {
+  supportedSubmitMethods: ["get", "head"],
+  persistAuthorization: false,
+  validatorUrl: null,
+};
+app.use(
+  "/",
+  ...swaggerUi.serveFiles(undefined, {
+    swaggerUrl: "/api/openapi.json",
+    swaggerOptions,
+  }),
+);
+app.get(
+  "/",
+  swaggerUi.setup(undefined, {
+    swaggerUrl: "/api/openapi.json",
+    swaggerOptions,
+    customSiteTitle: "PayBridge API Documentation",
+  }),
+);
+app.get("/api/openapi.json", (_request, response) => {
+  response.json(openApiDocument);
+});
 app.use(
   "/api/webhooks/stripe",
   express.raw({ type: "application/json" }),

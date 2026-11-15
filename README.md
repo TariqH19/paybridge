@@ -13,6 +13,7 @@ MongoDB Atlas is the operational data backbone. The application stores catalogue
 - [Technology stack](#technology-stack)
 - [Local setup](#local-setup)
 - [Vercel deployment](#vercel-deployment)
+- [Developer resources](#developer-resources)
 - [Example workflows](#example-workflows)
 - [Known limitations](#known-limitations)
 
@@ -101,6 +102,7 @@ Versions below are resolved in `package-lock.json`; Node.js is the documented ru
 | Database | MongoDB Atlas, MongoDB Node.js driver 6.22.0 |
 | Payments | Stripe Node.js SDK 23.1.0, test mode only |
 | Validation | Zod 4.6.7 |
+| API documentation | OpenAPI 3.0.3, Swagger UI Express |
 | Monorepo | npm workspaces: `packages/frontend` and `packages/backend` |
 
 ## Local setup
@@ -185,7 +187,7 @@ Deploy the backend and frontend as **two Vercel projects** connected to this rep
 | Build Command | `npm run build` |
 | Output Directory | Leave unset; Vercel manages the Express Function output |
 
-No backend `vercel.json` is required with the Express preset and this default-export entry. Use the repository’s npm workspace lockfile during dependency installation. Do not set `PORT` for the Vercel Function. Keep the existing `/api` route paths; for example, health is `/api/health` and the Stripe test webhook is `/api/webhooks/stripe`.
+The backend [`vercel.json`](packages/backend/vercel.json) includes Swagger UI's static distribution files in the Express Function bundle; those files are served with their asset MIME types. Use the repository’s npm workspace lockfile during dependency installation and enable including files outside the Root Directory as needed for the npm workspace. Do not set `PORT` for the Vercel Function. Keep the existing `/api` route paths; for example, health is `/api/health` and the Stripe test webhook is `/api/webhooks/stripe`.
 
 Configure these values in the **backend project only**:
 
@@ -211,6 +213,18 @@ The Vercel build log should run the frontend workspace build (`tsc -b && vite bu
 Set `VITE_API_URL` to `https://<backend-domain>/api` in the frontend project’s build environment. This is public configuration, not a secret. The frontend [`vercel.json`](packages/frontend/vercel.json) rewrites SPA paths such as `/shop`, `/admin`, and checkout return routes to `index.html`, so direct navigation and refresh work.
 
 Set Vercel production and preview values deliberately: each frontend origin must be allowed by the backend’s single-origin `FRONTEND_URL` setting, or preview access must be handled through a separately designed allowlist. Register the Stripe test webhook against the deployed backend URL and use that endpoint’s signing secret. Do not enable live keys or live webhook endpoints.
+
+## Developer resources
+
+- [Interactive API documentation (local)](http://localhost:3001/)
+- [OpenAPI JSON (local)](http://localhost:3001/api/openapi.json)
+- [MongoDB architecture](docs/MONGODB_ARCHITECTURE.md)
+- [System architecture](docs/ARCHITECTURE.md)
+- [MongoDB data model](docs/DATA_MODEL.md)
+- [Technical decisions](docs/TECHNICAL_DECISIONS.md)
+- [GitHub source code](https://github.com/TariqH19/paybridge)
+
+Swagger UI documents the existing API. Its Try it out controls are restricted to `GET` and `HEAD`; it cannot submit order, checkout, login, refund, or webhook requests. Admin read operations still require a valid admin bearer session. No demo admin credentials are published.
 
 ## Example workflows
 

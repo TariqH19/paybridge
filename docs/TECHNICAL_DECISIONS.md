@@ -76,7 +76,7 @@ This document describes the architecture visible in the current codebase and the
 
 ## On-demand analytics
 
-**Implemented:** MongoDB aggregation pipelines compute current metrics and charts from orders and refunds when the admin requests them. Relevant compound indexes are created at backend startup; API and response filters are validated with Zod.
+**Implemented:** MongoDB aggregation pipelines compute current metrics and charts from orders and refunds when the admin requests them. Relevant indexes are applied by the controlled `npm run db:indexes` setup command, separately from API startup; API and response filters are validated with Zod.
 
 **Rationale:** This keeps metrics tied to stored order/refund data and avoids maintaining a second reporting store or fabricated frontend metrics. Currency grouping and status/date filters happen in MongoDB rather than downloading all documents into React.
 
